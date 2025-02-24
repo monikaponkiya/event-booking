@@ -1,7 +1,13 @@
 import './App.css';
+import BookingComponent from './pages/booking-event';
+import { BookingProvider } from './store/Booking-provider';
 
-function App() {
-  return <h1 className="text-3xl font-bold underline">Hello world!</h1>;
-}
+const App = () => {
+  return (
+    <BookingProvider>
+      <BookingComponent />
+    </BookingProvider>
+  );
+};
 
 export default App;
