@@ -6,14 +6,16 @@ import { UserObj } from '../util/types';
 const total_slot = TOTAL_SLOT || 10;
 const local_storage_key = LOCAL_STORAGE_KEY;
 
+interface IEvent {
+  id: number;
+  name: string;
+  availableSlots: number;
+  bookings: UserObj[];
+  waitingList: UserObj[];
+}
+
 interface IContextProp {
-  events: {
-    id: number;
-    name: string;
-    availableSlots: number;
-    bookings: UserObj[];
-    waitingList: UserObj[];
-  }[];
+  events: IEvent[];
   addEvent: (eventName: string) => void;
   bookSlot: (eventId: number, user: string) => void;
   cancelBooking: (eventId: number, bookingId: number) => void;
@@ -33,7 +35,7 @@ interface IProps {
 }
 
 export const BookingProvider: React.FC<IProps> = ({ children }) => {
-  const [events, setEvents] = useState<IContextProp['events']>([]);
+  const [events, setEvents] = useState<IEvent[]>([]);
 
   useEffect(() => {
     const storedData = JSON.parse(localStorage.getItem(local_storage_key) ?? '[]');
@@ -53,20 +55,22 @@ export const BookingProvider: React.FC<IProps> = ({ children }) => {
 
   const bookSlot = (eventId: number, user: string) => {
     setEvents(
-      events.map((event) => {
-        if (event.id === eventId) {
-          if (event.availableSlots > 0) {
-            return {
+      events.map((event) =>
+        event.id === eventId
+          ? {
               ...event,
-              availableSlots: event.availableSlots - 1,
-              bookings: [...event.bookings, { id: Date.now(), user }]
-            };
-          } else {
-            return { ...event, waitingList: [...event.waitingList, { id: Date.now(), user }] };
-          }
-        }
-        return event;
-      })
+              availableSlots: event.availableSlots > 0 ? event.availableSlots - 1 : 0,
+              bookings:
+                event.availableSlots > 0
+                  ? [...event.bookings, { id: Date.now(), user }]
+                  : event.bookings,
+              waitingList:
+                event.availableSlots === 0
+                  ? [...event.waitingList, { id: Date.now(), user }]
+                  : event.waitingList
+            }
+          : event
+      )
     );
   };
 
@@ -75,21 +79,20 @@ export const BookingProvider: React.FC<IProps> = ({ children }) => {
       events.map((event) => {
         if (event.id === eventId) {
           const updatedBookings = event.bookings.filter((b) => b.id !== bookingId);
-          let newWaitingList = [...event.waitingList];
-          let newBookings = updatedBookings;
-          let newAvailableSlots = event.availableSlots + 1;
+          let updatedWaitingList = [...event.waitingList];
+          let updatedAvailableSlots = event.availableSlots + 1;
 
-          if (newWaitingList.length > 0) {
-            const nextUser = newWaitingList.shift() as UserObj;
-            newBookings.push(nextUser);
-            newAvailableSlots--;
+          if (updatedWaitingList.length > 0) {
+            const nextUser = updatedWaitingList.shift() as UserObj;
+            updatedBookings.push(nextUser);
+            updatedAvailableSlots--;
           }
 
           return {
             ...event,
-            bookings: newBookings,
-            waitingList: newWaitingList,
-            availableSlots: newAvailableSlots
+            bookings: updatedBookings,
+            waitingList: updatedWaitingList,
+            availableSlots: updatedAvailableSlots
           };
         }
         return event;
@@ -97,9 +100,7 @@ export const BookingProvider: React.FC<IProps> = ({ children }) => {
     );
   };
 
-  const resetSystem = () => {
-    setEvents([]);
-  };
+  const resetSystem = () => setEvents([]);
 
   const memoizedValue = useMemo(
     () => ({ events, addEvent, bookSlot, cancelBooking, resetSystem }),
